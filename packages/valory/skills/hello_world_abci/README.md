@@ -19,9 +19,9 @@ application for a simple demonstration.
 
    Select the keeper agent.
 
-* `PrintMessageBehaviour`
+* `NFTTransferBehaviour`
 
-   Prints the celebrated 'HELLO WORLD!' message.
+   Transfers the NFT to the agent with the most votes.
 
 * `ResetAndPauseBehaviour`
 
