@@ -38,7 +38,7 @@ class CollectRandomnessPayload(BaseTxPayload):
 
 
 @dataclass(frozen=True)
-class PrintMessagePayload(BaseTxPayload):
+class NFTTransferPayload(BaseTxPayload):
     """Represent a transaction payload of type 'randomness'."""
 
     message: str

@@ -22,6 +22,7 @@
 import random
 from abc import ABC
 from typing import Generator, Set, Type, cast
+from packages.valory.protocols.contract_api import ContractApiMessage
 
 from packages.valory.skills.abstract_round_abci.behaviours import (
     AbstractRoundBehaviour,
@@ -30,7 +31,7 @@ from packages.valory.skills.abstract_round_abci.behaviours import (
 from packages.valory.skills.hello_world_abci.models import HelloWorldParams, SharedState
 from packages.valory.skills.hello_world_abci.payloads import (
     CollectRandomnessPayload,
-    PrintMessagePayload,
+    NFTTransferPayload,
     RegistrationPayload,
     ResetPayload,
     SelectKeeperPayload,
@@ -38,7 +39,7 @@ from packages.valory.skills.hello_world_abci.payloads import (
 from packages.valory.skills.hello_world_abci.rounds import (
     CollectRandomnessRound,
     HelloWorldAbciApp,
-    PrintMessageRound,
+    NFTTransferRound,
     RegistrationRound,
     ResetAndPauseRound,
     SelectKeeperRound,
@@ -63,25 +64,34 @@ class HelloWorldABCIBaseBehaviour(BaseBehaviour, ABC):
 
 
 class RegistrationBehaviour(HelloWorldABCIBaseBehaviour):
-    """Register to the next round."""
+    """Register to the next round and check NFT ownership."""
 
     matching_round = RegistrationRound
 
-    def async_act(self) -> Generator:
-        """
-        Do the action.
+    async def async_act(self):
+        """Perform async action to check NFT ownership and register agents."""
+        # Check if the agent is the NFT owner and build the registration payload
+        registration_payload = RegistrationPayload(self.context.agent_address)
+        nft_owner_payload = None  # This will store the NFT owner payload if the agent owns the NFT
+        
+        # Fetch the current NFT owner from the smart contract
+        current_nft_owner = await self.get_nft_owner()
+        
+        if current_nft_owner:
+            self.context.logger.info(f"NFT (Token ID: {self.token_id}) is currently owned by {current_nft_owner}.")
+            if current_nft_owner == self.context.agent_address:
+                nft_owner_payload = RegistrationPayload(self.context.agent_address, is_nft_owner=True)
 
-        Steps:
-        - Build a registration transaction.
-        - Send the transaction and wait for it to be mined.
-        - Wait until ABCI application transitions to the next round.
-        - Go to the next behaviour (set done event).
-        """
-        payload = RegistrationPayload(self.context.agent_address)
-        yield from self.send_a2a_transaction(payload)
-        yield from self.wait_until_round_end()
+        # Send the registration payload
+        await self.send_a2a_transaction(registration_payload)
+
+        # Additionally send the NFT owner payload if it exists
+        if nft_owner_payload:
+            await self.send_a2a_transaction(nft_owner_payload)
+
+        # Wait until the end of the round
+        await self.wait_until_round_end()
         self.set_done()
-
 
 class CollectRandomnessBehaviour(HelloWorldABCIBaseBehaviour):
     """Retrieve randomness."""
@@ -168,43 +178,60 @@ class SelectKeeperBehaviour(HelloWorldABCIBaseBehaviour, ABC):
         self.set_done()
 
 
-class PrintMessageBehaviour(HelloWorldABCIBaseBehaviour, ABC):
-    """Prints the celebrated 'HELLO WORLD!' message."""
 
-    matching_round = PrintMessageRound
+class NFTTransferBehaviour(HelloWorldABCIBaseBehaviour):
+    """Behaviour for handling the NFT transfer."""
 
-    def async_act(self) -> Generator:
+    matching_round = NFTTransferRound
+    
+    async def async_act(self) -> Generator:
         """
-        Do the action.
-
-        Steps:
-        - Determine if this agent is the current keeper agent.
-        - Print the appropriate to the local console.
-        - Send the transaction with the printed message and wait for it to be mined.
-        - Wait until ABCI application transitions to the next round.
-        - Go to the next behaviour (set done event).
+        Perform the NFT transfer.
         """
+        # Retrieve the most voted keeper address and NFT ownership information from the synchronized data
+        most_voted_keeper_address = self.synchronized_data.most_voted_keeper_address
+        current_owner_address = self.synchronized_data.get_nft_owner_by_token_id(self.context.params.token_id)
+        
+        if most_voted_keeper_address and self.context.agent_address == current_owner_address:
+            # Interaction with the Ethereum API or other blockchain service
+            self.ledger_api = self.context.ledger_apis.get_api('ethereum')
 
-        if (
-            self.context.agent_address
-            == self.synchronized_data.most_voted_keeper_address
-        ):
-            message = self.params.hello_world_string
+            # Fetch contract and token id details from context parameters
+            contract_id = self.context.params.contract_id
+            token_id = self.context.params.token_id
+            
+            # Fetch the contract instance
+            nft_contract = self.ledger_api.get_contract(contract_id)
+            transfer_function = nft_contract.functions.transferFrom(current_owner_address, most_voted_keeper_address, token_id)
+
+            # Create the transaction to transfer the NFT
+            tx = transfer_function.build_transaction({
+                "from": current_owner_address  # This sends the transaction from the current owner's address
+            })
+
+            # The following steps assume the agent's private key is loaded and accessible for signing transactions
+            # Sign the transaction
+            tx_signed = self.ledger_api.sign_transaction(tx)
+            
+            # Send the signed transaction
+            tx_digest = self.ledger_api.send_signed_transaction(tx_signed)
+
+            if tx_digest:
+                self.context.logger.info(f"Transaction successfully sent with digest: {tx_digest}")
+                # Broadcast a payload to notify other agents of the NFT transfer (assuming this function exists)
+                nft_transfer_payload = ... # Create the payload to notify others
+                await self.send_a2a_transaction(nft_transfer_payload)
+            else:
+                self.context.logger.error("Failed to send the NFT transfer transaction.")
+
+            # Proceed to the next round or behave according to the transaction result
+            self.set_done()
+        elif most_voted_keeper_address:
+            # The current agent is not the owner, so no action is required
+            self.set_done()
         else:
-            message = ":|"
-
-        printed_message = f"Agent {self.context.agent_name} (address {self.context.agent_address}) in period {self.synchronized_data.period_count} says: {message}"
-
-        print(printed_message)
-        self.context.logger.info(f"printed_message={printed_message}")
-
-        payload = PrintMessagePayload(self.context.agent_address, printed_message)
-
-        yield from self.send_a2a_transaction(payload)
-        yield from self.wait_until_round_end()
-
-        self.set_done()
-
+            self.context.logger.error("No agent elected to receive the NFT; transfer cannot proceed.")
+            self.set_failed()
 
 class ResetAndPauseBehaviour(HelloWorldABCIBaseBehaviour):
     """Reset behaviour."""
@@ -250,6 +277,6 @@ class HelloWorldRoundBehaviour(AbstractRoundBehaviour):
         RegistrationBehaviour,  # type: ignore
         CollectRandomnessBehaviour,  # type: ignore
         SelectKeeperBehaviour,  # type: ignore
-        PrintMessageBehaviour,  # type: ignore
+        NFTTransferBehaviour,  # type: ignore
         ResetAndPauseBehaviour,  # type: ignore
     }
