@@ -184,7 +184,7 @@ class NFTTransferBehaviour(HelloWorldABCIBaseBehaviour):
 
     matching_round = NFTTransferRound
     
-    async def async_act(self) -> Generator:
+    def async_act(self) -> Generator:
         """
         Perform the NFT transfer.
         """
@@ -219,8 +219,9 @@ class NFTTransferBehaviour(HelloWorldABCIBaseBehaviour):
             if tx_digest:
                 self.context.logger.info(f"Transaction successfully sent with digest: {tx_digest}")
                 # Broadcast a payload to notify other agents of the NFT transfer (assuming this function exists)
-                nft_transfer_payload = ... # Create the payload to notify others
-                await self.send_a2a_transaction(nft_transfer_payload)
+                transfer_details = f"Token ID: {token_id}, From: {current_owner_address}, To: {most_voted_keeper_address}"
+                nft_transfer_payload = NFTTransferPayload(message=transfer_details)
+                yield from self.send_a2a_transaction(nft_transfer_payload)
             else:
                 self.context.logger.error("Failed to send the NFT transfer transaction.")
 
