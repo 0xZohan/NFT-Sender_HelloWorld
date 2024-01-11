@@ -74,7 +74,7 @@ models:
       share_tm_config_on_startup: ${bool:false}
       on_chain_service_id: ${int:null}
       setup:
-        all_participants: ${list:[]}
+        all_participants: ${list:['0x74f02e82B612c387c27b174A23B19Eb86fBFd1ce', '0x9433ca09c61BD0c693c83feecB24be177069ac80', '0xe53e0ad9379ea5513d5674D38048F7C10391Df35', '0x399e497Bf0B7e6B575e1713664419e0Ab9d34C92']}
         safe_contract_address: ${str:'0x0000000000000000000000000000000000000000'}
         consensus_threshold: ${int:null}
       tendermint_url: ${str:http://localhost:26657}
