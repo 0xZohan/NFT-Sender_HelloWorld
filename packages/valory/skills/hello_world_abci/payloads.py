@@ -27,7 +27,8 @@ from packages.valory.skills.abstract_round_abci.base import BaseTxPayload
 @dataclass(frozen=True)
 class RegistrationPayload(BaseTxPayload):
     """Represent a transaction payload of type 'registration'."""
-
+    agent_address: str
+    is_nft_owner: bool = False  # Default to False until proven the agent is NFT owner
 
 @dataclass(frozen=True)
 class CollectRandomnessPayload(BaseTxPayload):
