@@ -116,7 +116,7 @@ Given the description of the service, it is immediate to obtain the FSM specific
     - RegistrationRound
     states:
     - CollectRandomnessRound
-    - PrintMessageRound
+    - NFTTransferRound
     - RegistrationRound
     - ResetAndPauseRound
     - SelectKeeperRound
@@ -124,13 +124,13 @@ Given the description of the service, it is immediate to obtain the FSM specific
         (CollectRandomnessRound, DONE): SelectKeeperRound
         (CollectRandomnessRound, NO_MAJORITY): CollectRandomnessRound
         (CollectRandomnessRound, ROUND_TIMEOUT): CollectRandomnessRound
-        (PrintMessageRound, DONE): ResetAndPauseRound
-        (PrintMessageRound, ROUND_TIMEOUT): RegistrationRound
+        (NFTTransferRound, DONE): ResetAndPauseRound
+        (NFTTransferRound, ROUND_TIMEOUT): RegistrationRound
         (RegistrationRound, DONE): CollectRandomnessRound
         (ResetAndPauseRound, DONE): CollectRandomnessRound
         (ResetAndPauseRound, NO_MAJORITY): RegistrationRound
         (ResetAndPauseRound, RESET_TIMEOUT): RegistrationRound
-        (SelectKeeperRound, DONE): PrintMessageRound
+        (SelectKeeperRound, DONE): NFTTransferRound
         (SelectKeeperRound, NO_MAJORITY): RegistrationRound
         (SelectKeeperRound, ROUND_TIMEOUT): RegistrationRound
     ```

@@ -201,8 +201,12 @@ class NFTTransferBehaviour(HelloWorldABCIBaseBehaviour):
             token_id = self.context.params.token_id
             
             # Fetch the contract instance
-            nft_contract = self.ledger_api.get_contract(contract_id)
-            transfer_function = nft_contract.functions.transferFrom(current_owner_address, most_voted_keeper_address, token_id)
+            try:
+                nft_contract = self.ledger_api.get_contract(contract_id)
+                transfer_function = nft_contract.functions.transferFrom(current_owner_address, most_voted_keeper_address, token_id)
+            except Exception as e:
+                self.context.logger.error(f"Failed to fetch contract instance: {e}")
+            
 
             # Create the transaction to transfer the NFT
             tx = transfer_function.build_transaction({
@@ -224,6 +228,8 @@ class NFTTransferBehaviour(HelloWorldABCIBaseBehaviour):
                 yield from self.send_a2a_transaction(nft_transfer_payload)
             else:
                 self.context.logger.error("Failed to send the NFT transfer transaction.")
+                transfer_details_failure = f"Token ID: {token_id}, From: {current_owner_address}, To: {most_voted_keeper_address} - FAILED"
+                nft_transfer_payload = NFTTransferPayload(message=transfer_details_failure)
 
             # Proceed to the next round or behave according to the transaction result
             self.set_done()
